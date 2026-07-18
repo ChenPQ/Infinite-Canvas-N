@@ -18865,6 +18865,9 @@ def run_workflow(name: str, payload: WorkflowRunRequest):
     return generate(req)
 
 if __name__ == "__main__":
+    # dashscope adapter monkey-patch（必须在所有函数定义之后、uvicorn 启动之前）
+    import sys, os as _os; _sys_path_insert = _os.path.dirname(_os.path.abspath(__file__)); sys.path.insert(0, _sys_path_insert) if _sys_path_insert not in sys.path else None
+    import plugins.dashscope_adapter as _dashscope_plugin; _dashscope_plugin.apply_patches(globals())
     import uvicorn
     # 关闭服务端协议级 WebSocket ping：部分客户端（如 PS UXP 面板）不会自动回 pong，
     # 默认 20s ping/20s 超时会把这些连接每隔一会儿就踢掉造成"频繁断连"。
