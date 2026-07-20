@@ -1,0 +1,14 @@
+2026-07-20 14:05:13 [INFO] uvicorn.error: Started server process [32960]
+2026-07-20 14:05:13 [INFO] uvicorn.error: Waiting for application startup.
+2026-07-20 14:05:13 [INFO] uvicorn.error: Application startup complete.
+2026-07-20 14:05:13 [INFO] uvicorn.error: Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+2026-07-20 14:05:27 [INFO] uvicorn.error: Started server process [2532]
+2026-07-20 14:05:27 [INFO] uvicorn.error: Waiting for application startup.
+2026-07-20 14:05:27 [INFO] uvicorn.error: Application startup complete.
+2026-07-20 14:05:27 [INFO] uvicorn.error: Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+2026-07-20 14:06:24 [INFO] uvicorn.error: Started server process [36300]
+2026-07-20 14:06:24 [INFO] uvicorn.error: Waiting for application startup.
+2026-07-20 14:06:24 [INFO] uvicorn.error: Application startup complete.
+2026-07-20 14:06:24 [INFO] uvicorn.error: Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+2026-07-20 14:06:34 [INFO] uvicorn.error: 127.0.0.1:1541 - "WebSocket /ws/stats?client_id=7d53b0e9-dff5-48c4-bacb-604c698eedee" [accepted]
+2026-07-20 14:06:34 [INFO] uvicorn.error: connection open

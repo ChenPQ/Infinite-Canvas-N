@@ -232,6 +232,7 @@ LOCAL_UPLOAD_DIR = os.path.join(ASSETS_DIR, "uploads")
 HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 API_ENV_FILE = os.path.join(BASE_DIR, "API", ".env")
 DATA_DIR = os.path.join(BASE_DIR, "data")
+LOG_DIR = os.path.join(DATA_DIR, "logs")
 CONVERSATION_DIR = os.path.join(DATA_DIR, "conversations")
 CANVAS_DIR = os.path.join(DATA_DIR, "canvases")
 MEDIA_PREVIEW_DIR = os.path.join(DATA_DIR, "media_previews")
@@ -17576,9 +17577,37 @@ if __name__ == "__main__":
     # dashscope adapter monkey-patch（必须在所有函数定义之后、uvicorn 启动之前）
     import sys, os as _os; _sys_path_insert = _os.path.dirname(_os.path.abspath(__file__)); sys.path.insert(0, _sys_path_insert) if _sys_path_insert not in sys.path else None
     import plugins.dashscope_adapter as _dashscope_plugin; _dashscope_plugin.apply_patches(globals())
-    import uvicorn
+
+    import uvicorn, logging, logging.handlers
+
+    # --- 文件日志配置 ---
+    os.makedirs(LOG_DIR, exist_ok=True)
+    _log_file = os.path.join(LOG_DIR, "server.log")
+
+    # 在 uvicorn 启动后立即给其所有 logger 附加文件 handler（通过 log_config 禁用默认配置，
+    # 改用我们自定义的 dictConfig，同时保留控制台输出 + 新增文件输出）
+    _log_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s", "datefmt": "%Y-%m-%d %H:%M:%S"},
+            "access": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(client_addr)s - \"%(request_line)s\" %(status_code)s", "datefmt": "%Y-%m-%d %H:%M:%S"},
+        },
+        "handlers": {
+            "console": {"class": "logging.StreamHandler", "formatter": "default", "stream": "ext://sys.stdout"},
+            "console_access": {"class": "logging.StreamHandler", "formatter": "access", "stream": "ext://sys.stdout"},
+            "file": {"class": "logging.handlers.TimedRotatingFileHandler", "formatter": "default", "filename": _log_file, "when": "midnight", "interval": 1, "backupCount": 7, "encoding": "utf-8"},
+            "file_access": {"class": "logging.handlers.TimedRotatingFileHandler", "formatter": "access", "filename": _log_file, "when": "midnight", "interval": 1, "backupCount": 7, "encoding": "utf-8"},
+        },
+        "loggers": {
+            "uvicorn.error": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+            "uvicorn.access": {"handlers": ["console_access", "file_access"], "level": "INFO", "propagate": False},
+        },
+    }
+
     # 关闭服务端协议级 WebSocket ping：部分客户端（如 PS UXP 面板）不会自动回 pong，
     # 默认 20s ping/20s 超时会把这些连接每隔一会儿就踢掉造成"频繁断连"。
     # 客户端有自己的应用层心跳 + 断线重连兜底，这里禁用协议 ping 更稳。
     uvicorn.run(app, host="0.0.0.0", port=3000,
-                ws_ping_interval=None, ws_ping_timeout=None)
+                ws_ping_interval=None, ws_ping_timeout=None,
+                log_config=_log_config)
