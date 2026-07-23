@@ -129,6 +129,61 @@ def _is_provider(provider):
         return True
     return False
 
+def _build_reference_image_content(reference_images, g):
+    """将参考图列表转为百炼 messages content 中的 image 条目。
+
+    支持三种来源：
+      1. 本地文件路径（/assets/xxx、/output/xxx）→ 转 base64 data URL
+      2. 已经是 data:image/xxx;base64,... → 直接使用
+      3. 远程 URL（https://...）→ 直接透传
+
+    百炼 content 格式：[{"image": "base64或URL"}]
+    """
+    refs = reference_images or []
+    if not refs:
+        return []
+
+    output_file_from_url = g.get("output_file_from_url")
+    max_refs = g.get("ONLINE_IMAGE_REFERENCE_MAX", 20)
+    items = []
+
+    for ref in refs[:max_refs]:
+        if not isinstance(ref, dict):
+            continue
+        url = str(ref.get("url") or "").strip()
+        if not url:
+            continue
+
+        # 已经是 data URL，直接用
+        if url.startswith("data:image/"):
+            items.append({"image": url})
+            continue
+
+        # 本地文件：通过 main.py 的 output_file_from_url 找到路径 → 转 base64
+        local_path = None
+        if output_file_from_url:
+            local_path = output_file_from_url(url)
+        if local_path:
+            try:
+                with open(local_path, "rb") as f:
+                    data = f.read()
+                # 根据扩展名推断 MIME
+                import mimetypes as _mt
+                mime = _mt.guess_type(local_path)[0] or "image/png"
+                encoded = __import__("base64").b64encode(data).decode("ascii")
+                items.append({"image": f"data:{mime};base64,{encoded}"})
+                continue
+            except Exception as e:
+                logger.warning(f"读取参考图本地文件失败: {local_path}, {e}")
+                _log_error("ref_local_file", f"读取失败: {e}", {"path": str(local_path)})
+                continue
+
+        # 远程 URL，直接透传
+        if url.startswith("http://") or url.startswith("https://"):
+            items.append({"image": url})
+            continue
+
+    return items
 
 def _extract_image_url(raw):
     """从百炼 DashScope 响应中手动提取图片 URL。
