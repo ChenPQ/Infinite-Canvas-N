@@ -257,11 +257,11 @@ def apply_patches(g):
     # ── 3. Wrap generate_ai_image，拦截 dashscope provider ──
     _orig_gen = g["generate_ai_image"]
 
-    async def _patched_gen(prompt, size, quality, model, reference_images=None, provider_id="comfly"):
+    async def _patched_gen(prompt, size, quality, model, reference_images=None, provider_id="comfly", aspect_ratio="", resolution=""):
         provider = g["get_api_provider"](provider_id)
         if _is_provider(provider):
             return await _generate_dashscope_image(prompt, size, model, reference_images, provider)
-        return await _orig_gen(prompt, size, quality, model, reference_images, provider_id)
+        return await _orig_gen(prompt, size, quality, model, reference_images, provider_id, aspect_ratio, resolution)
 
     g["generate_ai_image"] = _patched_gen
 
