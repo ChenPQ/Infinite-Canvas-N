@@ -207,10 +207,12 @@ def _extract_image_url(raw):
 # 百炼 DashScope 生图函数
 # ─────────────────────────────────────────────────────
 
-async def _generate_dashscope_image(prompt, size, model, reference_images=None, provider=None):
+async def _generate_dashscope_image(prompt, size, model, reference_images=None, provider=None, g=None):
     """通过百炼 DashScope 原生接口生成图片。
     千问 qwen-image → 同步调用 /api/v1/services/aigc/multimodal-generation/generation
     万相 wan       → 异步轮询 /api/v1/services/aigc/image-generation/generation
+
+    对于图片编辑模型（如 qwen-image-edit-max），必须包含参考图（1~3 张）。
     """
     api_key = _get_api_key(provider)
     if not api_key:
@@ -219,10 +221,23 @@ async def _generate_dashscope_image(prompt, size, model, reference_images=None, 
 
     root = _clean_base((provider or {}).get("base_url") or "https://dashscope.aliyuncs.com")
     ds_size = _size_from_pair(size)
-    messages = [{"role": "user", "content": [{"text": prompt.strip()}]}]
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     timeout_conf = httpx.Timeout(connect=20.0, read=1800.0, write=120.0, pool=20.0)
     is_wan = str(model or "").strip().lower().startswith("wan")
+    model_lower = str(model or "").strip().lower()
+    is_edit_model = "edit" in model_lower
+
+    # 构建参考图内容（编辑模型必须传图）
+    image_items = []
+    if g and reference_images:
+        image_items = _build_reference_image_content(reference_images, g)
+    if is_edit_model and not image_items:
+        _log_error("generate_image", "编辑模型缺少参考图", {"model": model})
+        raise HTTPException(status_code=400, detail="该模型为图片编辑模型，需要先添加 1~3 张参考图。")
+
+    # 组装 message content：text + image 条目
+    content = [{"text": prompt.strip()}] + [{"image": item["image"]} for item in image_items]
+    messages = [{"role": "user", "content": content}]
 
     if is_wan:
         # ── 万相异步模式：提交任务 → 轮询结果 ──
@@ -315,7 +330,7 @@ def apply_patches(g):
     async def _patched_gen(prompt, size, quality, model, reference_images=None, provider_id="comfly", aspect_ratio="", resolution=""):
         provider = g["get_api_provider"](provider_id)
         if _is_provider(provider):
-            return await _generate_dashscope_image(prompt, size, model, reference_images, provider)
+            return await _generate_dashscope_image(prompt, size, model, reference_images, provider, g)
         return await _orig_gen(prompt, size, quality, model, reference_images, provider_id, aspect_ratio, resolution)
 
     g["generate_ai_image"] = _patched_gen
